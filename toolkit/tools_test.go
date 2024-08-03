@@ -6,6 +6,7 @@ import (
 	"image/png"
 	"io"
 	"mime/multipart"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"sync"
@@ -198,5 +199,30 @@ func TestTools_Slugify(t *testing.T) {
 
 			t.Errorf("%s: wrong slug returned expected: %s got:%s", e.name, e.expected, slug)
 		}
+	}
+}
+
+func TestTools_DownloadStaticFile(t *testing.T) {
+	tool := Tools{}
+
+	rr := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/", nil)
+
+	tool.DownloadStaticFile(rr, req, "./testdata", "not_a_database.png", "bart_meme.png")
+
+	res := rr.Result()
+	defer res.Body.Close()
+
+	if res.Header["Content-Length"][0] != "247441" {
+		t.Error("wrong content length of", res.Header["Content-Length"][0])
+	}
+
+	if res.Header["Content-Disposition"][0] != "attachment; filename=\"bart_meme.png\"" {
+		t.Errorf("wrong content disposition: %s", res.Header["Content-Disposition"][0])
+	}
+
+	_, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Error(err)
 	}
 }
