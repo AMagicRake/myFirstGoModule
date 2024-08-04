@@ -2,6 +2,7 @@ package toolkit
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,8 +19,10 @@ const randomStringSource = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVQXYZ
 // Tools is the type used to instantiate this module. Any variable of this type will have access
 // to all the methods with the reciever *Tools
 type Tools struct {
-	MaxFileSize  int
-	AllowedTypes []string
+	MaxFileSize        int
+	AllowedTypes       []string
+	MaxJsonSize        int
+	AllowUnknownFields bool
 }
 
 // RandomString returns a string of random characters of length n using randomStringSource
@@ -186,4 +189,37 @@ func (t *Tools) DownloadStaticFile(w http.ResponseWriter, r *http.Request, p, fi
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", displayName))
 
 	http.ServeFile(w, r, fp)
+}
+
+// JSONResponse is the type used for sending json around
+type JSONResponse struct {
+	Error   bool        `json:"error"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
+}
+
+func (t *Tools) ReadJSON(w http.ResponseWriter, r *http.Request, data interface{}) error {
+	maxBytes := 1024 * 1024
+	if t.MaxJsonSize != 0 {
+		maxBytes = t.MaxJsonSize
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, int64(maxBytes))
+
+	dec := json.NewDecoder(r.Body)
+	if !t.AllowUnknownFields {
+		dec.DisallowUnknownFields()
+	}
+
+	err := dec.Decode(data)
+	if err != nil {
+		return err
+	}
+
+	err = dec.Decode(&struct{}{})
+	if err != io.EOF {
+		return errors.New("body must contain only one JSON value")
+	}
+
+	return nil
 }
