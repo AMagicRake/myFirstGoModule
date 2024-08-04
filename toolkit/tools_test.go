@@ -328,3 +328,37 @@ func TestTools_ErrorJSON(t *testing.T) {
 	}
 
 }
+
+// generate mock client
+type RoundTripFunc func(req *http.Request) *http.Response
+
+func (f RoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req), nil
+}
+
+func NewTestClient(fn RoundTripFunc) *http.Client {
+	return &http.Client{
+		Transport: fn,
+	}
+}
+func TestTools_PushJSONToRemote(t *testing.T) {
+	client := NewTestClient(func(req *http.Request) *http.Response {
+		//test request parameters
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewBufferString("ok")),
+			Header:     make(http.Header),
+		}
+	})
+
+	tool := &Tools{}
+
+	foo := struct {
+		Bar string `json:"bar"`
+	}{Bar: "bar"}
+
+	_, _, err := tool.PushJSONToRemote("http://example.com/some/path", foo, client)
+	if err != nil {
+		t.Error("failed to call remote url: ", err)
+	}
+}
