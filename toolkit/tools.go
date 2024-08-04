@@ -198,6 +198,7 @@ type JSONResponse struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
+// ReadJSON tries to read the body of the request and convert it from jasonto go data variable
 func (t *Tools) ReadJSON(w http.ResponseWriter, r *http.Request, data interface{}) error {
 	maxBytes := 1024 * 1024
 	if t.MaxJsonSize != 0 {
@@ -246,5 +247,29 @@ func (t *Tools) ReadJSON(w http.ResponseWriter, r *http.Request, data interface{
 		return errors.New("body must contain only one JSON value")
 	}
 
+	return nil
+}
+
+// WriteJSON takes a response status code and arbitrary data and writes json to the client
+func (t *Tools) WriteJSON(w http.ResponseWriter, status int, data interface{}, headers ...http.Header) error {
+	out, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	if len(headers) > 0 {
+		for key, value := range headers[0] {
+			w.Header()[key] = value
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	_, err = w.Write(out)
+
+	if err != nil {
+		return err
+	}
 	return nil
 }
